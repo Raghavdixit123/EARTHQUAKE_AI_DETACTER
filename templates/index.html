@@ -1,0 +1,402 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earthquake AI & Weather Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b1120;
+            color: #e5e7eb;
+        }
+
+        header {
+            padding: 24px;
+            background: #111c31;
+            border-bottom: 1px solid #26344d;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 27px;
+        }
+
+        h2 {
+            margin-top: 30px;
+        }
+
+        .muted {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: #142039;
+            border: 1px solid #293954;
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .number {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 12px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .weather-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 14px;
+            background: #2563eb;
+            color: white;
+            border: 0;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        .event {
+            display: grid;
+            grid-template-columns: 70px 1fr auto;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            background: #142039;
+            border: 1px solid #293954;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .magnitude {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fbbf24;
+        }
+
+        .event a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .event a:hover {
+            text-decoration: underline;
+        }
+
+        .status-live {
+            color: #4ade80;
+        }
+
+        .status-error {
+            color: #f87171;
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        @media (max-width: 500px) {
+            main {
+                padding: 12px;
+            }
+
+            .event {
+                grid-template-columns: 55px 1fr;
+            }
+
+            .event > :last-child {
+                grid-column: 2;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <h1>🌍 Earthquake AI & Weather Dashboard</h1>
+    <div class="muted">
+        Live earthquake feed from USGS and current weather from Open-Meteo
+    </div>
+</header>
+
+<main>
+    <section class="weather-heading">
+        <div>
+            <h2>🌤️ Live Weather Dashboard</h2>
+            <div class="muted">Location: Lucknow, Uttar Pradesh</div>
+        </div>
+        <button id="weatherRefresh" onclick="loadWeather()">
+            Refresh Weather
+        </button>
+    </section>
+
+    <section class="stats">
+        <div class="card">
+            <div class="muted">Temperature</div>
+            <div class="number" id="weatherTemp">Loading...</div>
+            <div id="weatherCondition" class="muted">Getting weather...</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Humidity</div>
+            <div class="number" id="weatherHumidity">--</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Wind Speed</div>
+            <div class="number" id="weatherWind">--</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Feels Like</div>
+            <div class="number" id="weatherFeels">--</div>
+        </div>
+    </section>
+
+    <div id="weatherUpdated" class="muted">
+        Weather update pending...
+    </div>
+
+    <h2>🌎 Earthquake Monitoring</h2>
+
+    <section class="stats">
+        <div class="card">
+            <div class="muted">Feed Status</div>
+            <div class="number" id="status">Connecting...</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Events in Latest Feed</div>
+            <div class="number" id="count">--</div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Largest Magnitude</div>
+            <div class="number" id="largest">--</div>
+        </div>
+    </section>
+
+    <div class="muted" id="earthquakeUpdated">
+        Waiting for earthquake data...
+    </div>
+
+    <h2>📍 Latest Earthquakes</h2>
+    <div id="earthquakeList">
+        <div class="card">Loading earthquake events...</div>
+    </div>
+
+    <footer>
+        Weather: Open-Meteo · Earthquakes: USGS
+        <br>
+        This dashboard is informational and is not an official emergency alert system.
+    </footer>
+</main>
+
+<script>
+    // WEATHER DASHBOARD
+    async function loadWeather() {
+        const temp = document.getElementById("weatherTemp");
+        const condition = document.getElementById("weatherCondition");
+        const humidity = document.getElementById("weatherHumidity");
+        const wind = document.getElementById("weatherWind");
+        const feels = document.getElementById("weatherFeels");
+        const updated = document.getElementById("weatherUpdated");
+        const button = document.getElementById("weatherRefresh");
+
+        button.disabled = true;
+        button.textContent = "Refreshing...";
+
+        const url =
+            "https://api.open-meteo.com/v1/forecast" +
+            "?latitude=26.8467&longitude=80.9462" +
+            "&current=temperature_2m,relative_humidity_2m," +
+            "apparent_temperature,wind_speed_10m,weather_code" +
+            "&timezone=Asia%2FKolkata";
+
+        const descriptions = {
+            0: "Clear sky ☀️",
+            1: "Mainly clear 🌤️",
+            2: "Partly cloudy ⛅",
+            3: "Overcast ☁️",
+            45: "Fog 🌫️",
+            48: "Fog 🌫️",
+            51: "Light drizzle 🌦️",
+            53: "Drizzle 🌦️",
+            55: "Heavy drizzle 🌧️",
+            61: "Light rain 🌧️",
+            63: "Rain 🌧️",
+            65: "Heavy rain 🌧️",
+            71: "Light snow ❄️",
+            73: "Snow ❄️",
+            75: "Heavy snow ❄️",
+            80: "Rain showers 🌦️",
+            81: "Rain showers 🌧️",
+            82: "Heavy rain showers 🌧️",
+            95: "Thunderstorm ⛈️",
+            96: "Thunderstorm with hail ⛈️",
+            99: "Severe thunderstorm ⛈️"
+        };
+
+        try {
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error("Weather service returned an error");
+            }
+
+            const data = await response.json();
+            const w = data.current;
+
+            temp.textContent = `${w.temperature_2m} °C`;
+            condition.textContent =
+                descriptions[w.weather_code] || "Weather updated";
+            humidity.textContent = `${w.relative_humidity_2m}%`;
+            wind.textContent = `${w.wind_speed_10m} km/h`;
+            feels.textContent = `${w.apparent_temperature} °C`;
+
+            updated.textContent =
+                `Weather data time: ${w.time.replace("T", " ")} · ` +
+                `Checked at ${new Date().toLocaleTimeString()}`;
+        } catch (error) {
+            condition.textContent =
+                "Weather unavailable. Check your internet connection.";
+            updated.textContent = "Could not fetch weather data.";
+            console.error("Weather error:", error);
+        } finally {
+            button.disabled = false;
+            button.textContent = "Refresh Weather";
+        }
+    }
+
+    // EARTHQUAKE DASHBOARD
+    async function loadEarthquakes() {
+        const status = document.getElementById("status");
+        const count = document.getElementById("count");
+        const largest = document.getElementById("largest");
+        const list = document.getElementById("earthquakeList");
+        const updated = document.getElementById("earthquakeUpdated");
+
+        try {
+            const response = await fetch("/api/earthquakes");
+
+            if (!response.ok) {
+                throw new Error("Earthquake API request failed");
+            }
+
+            const data = await response.json();
+            const events = data.events || [];
+
+            status.textContent = data.status || "Unknown";
+            status.className = "number " +
+                (data.status === "Live" ? "status-live" : "status-error");
+
+            count.textContent = data.count ?? events.length;
+
+            const magnitudes = events
+                .map(event => Number(event.magnitude))
+                .filter(value => Number.isFinite(value));
+
+            largest.textContent = magnitudes.length
+                ? Math.max(...magnitudes).toFixed(1)
+                : "N/A";
+
+            updated.textContent = data.updated
+                ? "Last feed update: " +
+                  new Date(data.updated).toLocaleString()
+                : "Waiting for first feed update...";
+
+            if (events.length === 0) {
+                list.innerHTML =
+                    '<div class="card">No earthquake events available yet. ' +
+                    'Check the feed status above.</div>';
+                return;
+            }
+
+            list.replaceChildren();
+
+            events.slice(0, 30).forEach(event => {
+                const row = document.createElement("div");
+                row.className = "event";
+
+                const mag = document.createElement("div");
+                mag.className = "magnitude";
+                mag.textContent = event.magnitude == null
+                    ? "N/A"
+                    : Number(event.magnitude).toFixed(1);
+
+                const details = document.createElement("div");
+                const place = document.createElement("strong");
+                place.textContent = event.place || "Location unavailable";
+
+                const time = document.createElement("div");
+                time.className = "muted";
+                time.textContent = event.time
+                    ? new Date(event.time).toLocaleString()
+                    : "Time unavailable";
+
+                details.append(place, time);
+
+                const link = document.createElement("a");
+                link.textContent = "USGS details ↗";
+                link.href = event.url || "https://earthquake.usgs.gov/";
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+
+                row.append(mag, details, link);
+                list.appendChild(row);
+            });
+        } catch (error) {
+            status.textContent = "Unavailable";
+            status.className = "number status-error";
+            updated.textContent =
+                "Could not load earthquake data. Check the server terminal.";
+            list.innerHTML =
+                '<div class="card">Earthquake data could not be loaded. ' +
+                'Make sure your FastAPI server is running.</div>';
+            console.error("Earthquake error:", error);
+        }
+    }
+
+    // Load immediately, then refresh periodically.
+    loadWeather();
+    loadEarthquakes();
+
+    setInterval(loadWeather, 10 * 60 * 1000);
+    setInterval(loadEarthquakes, 60 * 1000);
+</script>
+</body>
+</html>
